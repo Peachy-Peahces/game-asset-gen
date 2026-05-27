@@ -1,15 +1,17 @@
 ﻿"""
 game-asset-gen - AI 2D Game Asset Generator
-FastAPI backend for generating 2D game assets via HuggingFace Inference API
+FastAPI backend for generating 2D game assets via SiliconFlow API (Tongyi-MAI/Z-Image-Turbo)
 """
 import io
+import json
 import os
+import ssl
 import time
 import uuid
 from pathlib import Path
 from typing import Optional
+import urllib.request
 
-import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -18,8 +20,10 @@ from PIL import Image
 from pydantic import BaseModel
 
 # Configuration
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/gokaygokay/Flux-2D-Game-Assets-LoRA"
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
+SF_API_URL = "https://api.siliconflow.cn/v1/images/generations"
+SF_API_KEY = os.environ.get("SF_API_KEY", "sk-qldnafwtngpczmpvxbiwezsdwvpqhenneptfdbnqutwghkxx")
+SF_MODEL = "Tongyi-MAI/Z-Image-Turbo"
+SSL_CTX = ssl.create_default_context()
 GENERATED_DIR = Path("generated")
 GENERATED_DIR.mkdir(exist_ok=True)
 
@@ -82,22 +86,31 @@ def remove_bg_simple(img):
     img.putdata(new_data)
     return img
 
-async def call_hf_api(prompt, max_retries=2):
-    headers = {"Content-Type": "application/json"}
-    if HF_TOKEN:
-        headers["Authorization"] = f"Bearer {HF_TOKEN}"
+def call_sf_api(prompt, max_retries=2):
+    """Call SiliconFlow image generation API using urllib (compatible with Python 3.8)."""
+    headers = {
+        "Authorization": f"Bearer {SF_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    data = json.dumps({
+        "model": SF_MODEL,
+        "prompt": prompt,
+        "image_size": "512x512",
+    }).encode("utf-8")
     for attempt in range(max_retries + 1):
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(HF_MODEL_URL, headers=headers, json={"inputs": prompt})
-                if resp.status_code == 200 and "image" in resp.headers.get("content-type", ""):
-                    return resp.content
-                elif resp.status_code == 503:
-                    time.sleep(20)
-                else:
-                    print(f"HF Error: {resp.status_code}")
+            req = urllib.request.Request(SF_API_URL, data=data, method="POST")
+            for k, v in headers.items():
+                req.add_header(k, v)
+            r = urllib.request.urlopen(req, timeout=30, context=SSL_CTX)
+            resp = json.loads(r.read().decode())
+            img_url = resp["images"][0]["url"]
+            # Download the actual image bytes
+            img_req = urllib.request.Request(img_url)
+            img_data = urllib.request.urlopen(img_req, timeout=15, context=SSL_CTX).read()
+            return img_data
         except Exception as e:
-            print(f"HF Exception: {e}")
+            print(f"SF Error (attempt {attempt+1}): {e}")
             if attempt < max_retries:
                 time.sleep(5)
     return None
@@ -117,7 +130,7 @@ async def generate_asset(req: GenerateRequest):
     if not req.prompt.strip():
         raise HTTPException(400, "prompt required")
     full_prompt = build_prompt(req)
-    image_bytes = await call_hf_api(full_prompt)
+    image_bytes = call_sf_api(full_prompt)
     filepath = None
     if image_bytes:
         try:

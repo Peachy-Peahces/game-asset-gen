@@ -1,4 +1,4 @@
-﻿# Game Asset Gen
+# Game Asset Gen
 
 AI 2D Game Asset Generator - 七牛云 XEngineer 暑期实训营项目
 
@@ -14,7 +14,7 @@ AI 2D Game Asset Generator - 七牛云 XEngineer 暑期实训营项目
 
 - 后端: Python FastAPI
 - 前端: HTML + Tailwind CSS
-- AI 生图: HuggingFace Inference API (Flux-2D-Game-Assets-LoRA)
+- AI 生图: **SiliconFlow** (通义万相 Tongyi-MAI/Z-Image-Turbo)
 
 ## 快速开始
 
@@ -22,12 +22,20 @@ AI 2D Game Asset Generator - 七牛云 XEngineer 暑期实训营项目
 # 安装依赖
 pip install -r requirements.txt
 
+# 配置 SiliconFlow API Key（可选，默认使用内置 key）
+# Windows
+set SF_API_KEY=sk-your-api-key
+# macOS/Linux
+export SF_API_KEY=sk-your-api-key
+
 # 运行
 python main.py
 
 # 访问
 # http://localhost:8000
 ```
+
+> SiliconFlow 注册地址: https://cloud.siliconflow.cn
 
 ## API
 
@@ -45,3 +53,10 @@ game-asset-gen/
 │   └── index.html    # 前端页面
 └── generated/        # 生成的图片
 ```
+
+## 技术说明
+
+- 使用 `urllib` 而非 `httpx` 调用 API，兼容 Python 3.8 环境下的 SSL 问题
+- 生成后自动 resize 到用户选择的尺寸（使用 PIL NEAREST 缩放保留像素感）
+- 生成后自动简单去背（白色背景转透明）
+- API 调用失败时自动降级为彩色格子占位图
