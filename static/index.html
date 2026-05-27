@@ -101,15 +101,22 @@
             <div class="bg-gray-800 rounded-lg p-6 mb-6">
                 <div class="flex items-start gap-3 mb-4">
                     <div class="bg-blue-900/50 rounded-lg p-3 text-sm text-blue-300 flex-1">
-                        💡 <b>Sprite Sheet 模式</b>：使用 img2img 技术保持角色一致性，生成 4 帧动画（待机→走路→攻击→施法），2×2 排列，可直接拖入游戏引擎使用。
-                        <br><span class="text-blue-400/70 text-xs">成本：约 ¥1.50/次（参考图 + 4帧 img2img）</span>
+                        💡 <b>Sprite Sheet 模式</b>：生成 4 帧动画（待机→走路→攻击→施法），2×2 排列，可直接拖入游戏引擎使用。
+                        <br><span class="text-blue-400/70 text-xs" id="spriteCostTip">图生图模式：约 ¥1.50/次（角色一致性更好）</span>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div class="md:col-span-2">
                         <label class="block text-sm mb-1 text-gray-400">角色描述（建议一个名词，如"火焰法师"）</label>
                         <input type="text" id="spritePrompt" placeholder="例如: 火焰法师、暗影刺客、机械骑士..."
                                class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">生成模式</label>
+                        <select id="spriteMode" class="w-full bg-gray-700 rounded px-4 py-2" onchange="onSpriteModeChange()">
+                            <option value="img2img">🎯 图生图（质量优先）</option>
+                            <option value="prompt">⚡ 纯Prompt（成本优先）</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm mb-1 text-gray-400">风格</label>
@@ -175,6 +182,19 @@
     </div>
 
     <script>
+        // ── Mode Switch Tip ────────────────────────────────────
+        function onSpriteModeChange() {
+            const mode = document.getElementById('spriteMode').value;
+            const tip  = document.getElementById('spriteCostTip');
+            if (mode === 'prompt') {
+                tip.textContent = '纯Prompt模式：约 ¥0.30/次（成本低，角色一致性一般）';
+                tip.className = 'text-yellow-400/70 text-xs';
+            } else {
+                tip.textContent = '图生图模式：约 ¥1.50/次（角色一致性更好）';
+                tip.className = 'text-blue-400/70 text-xs';
+            }
+        }
+
         // ── Tab Switch ──────────────────────────────────────────
         function switchTab(tab) {
             const single = document.getElementById('panel-single');
@@ -250,7 +270,8 @@
                     body: JSON.stringify({
                         prompt: prompt,
                         style: document.getElementById('spriteStyle').value,
-                        size: document.getElementById('spriteSize').value
+                        size: document.getElementById('spriteSize').value,
+                        mode: document.getElementById('spriteMode').value
                     })
                 });
                 const data = await resp.json();
@@ -260,9 +281,10 @@
                     document.getElementById('spriteDownloadBtn').classList.remove('hidden');
                     document.getElementById('spriteDownloadLink').href = data.url;
                     document.getElementById('spriteDownloadLink').download = data.filename;
+                    const modeLabel = data.mode === 'prompt' ? '⚡ 纯Prompt' : '🎯 图生图';
                     status.textContent = data.used_fallback
-                        ? '✅ 完成（含部分备用帧）'
-                        : '✅ Sprite Sheet 生成完成！';
+                        ? `✅ ${modeLabel} 完成（含部分备用帧）`
+                        : `✅ ${modeLabel} Sprite Sheet 生成完成！`;
 
                     // 各帧预览
                     const frameGrid = document.getElementById('frameGrid');

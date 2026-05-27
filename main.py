@@ -72,6 +72,7 @@ class SpriteSheetRequest(BaseModel):
     prompt: str       # 角色描述，如"骑士"
     style: str = "pixel"
     size: str = "64x64"
+    mode: str = "img2img"  # "img2img" (图生图，质量高) 或 "prompt" (纯prompt，成本低)
 
 # ─── 核心 API 调用 ────────────────────────────────────────────────────────────
 
@@ -192,14 +193,18 @@ async def generate_asset(req: GenerateRequest):
         "used_fallback": not bool(image_bytes),
     }
 
-# Sprite Sheet 生成（Route B：参考图 + img2img）
+# Sprite Sheet 生成（支持两种模式：img2img / 纯prompt）
 @app.post("/api/generate-spritesheet")
 async def generate_spritesheet(req: SpriteSheetRequest):
-    """Sprite Sheet 生成（Route B：参考图 + img2img）。
-    同步 API 调用放到线程池，避免阻塞 FastAPI 事件循环。
+    """Sprite Sheet 生成。
+    mode=img2img: 参考图 + img2img（质量高，¥1.50/次）
+    mode=prompt:  纯prompt生成（成本低，¥0.30/次）
     """
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(EXECUTOR, _generate_spritesheet_sync, req.prompt, req.style, req.size)
+    if req.mode == "prompt":
+        result = await loop.run_in_executor(EXECUTOR, _generate_spritesheet_prompt_sync, req.prompt, req.style, req.size)
+    else:
+        result = await loop.run_in_executor(EXECUTOR, _generate_spritesheet_sync, req.prompt, req.style, req.size)
     return result
 
 def _generate_spritesheet_sync(prompt: str, style: str, size_str: str):
@@ -265,9 +270,68 @@ def _generate_spritesheet_sync(prompt: str, style: str, size_str: str):
         "frame_names": FRAME_ORDER,
         "size":     size_str,
         "layout":   "2x2",
-        "used_img2img": True,
+        "mode":     "img2img",
         "used_fallback": frame_errors > 0,
         "ref_prompt": ref_prompt,
+    }
+
+def _generate_spritesheet_prompt_sync(prompt: str, style: str, size_str: str):
+    """Route C: 纯 prompt 生成 Sprite Sheet（无 img2img，成本低）。"""
+    size_str = size_str or "64x64"
+    w, h     = SIZE_MAP.get(size_str, (64, 64))
+
+    # 4 帧全部用纯 prompt 生成（无参考图）
+    frames: List[Image.Image] = []
+    frame_errors = 0
+    prompts_used = []
+    for frame_name in FRAME_ORDER:
+        frame_prompt = build_sprite_prompt(prompt, frame_name, style, size_str)
+        prompts_used.append(frame_prompt)
+        fb = _call_sf(frame_prompt)  # 纯文本 prompt，无参考图
+        if not fb:
+            frame_errors += 1
+            frames.append(Image.new("RGBA", (w, h), (100, 100, 100, 255)))
+        else:
+            try:
+                img = Image.open(io.BytesIO(fb)).convert("RGBA")
+                img = resize_image(img, size_str)
+                img = remove_bg_simple(img)
+                frames.append(img)
+            except:
+                frames.append(Image.new("RGBA", (w, h), (100, 100, 100, 255)))
+
+    # 拼接为 Sprite Sheet（2行×2列）
+    sheet_w = w * 2
+    sheet_h = h * 2
+    sheet   = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
+    for i, frame_img in enumerate(frames):
+        col = i % 2
+        row = i // 2
+        sheet.paste(frame_img, (col * w, row * h), frame_img)
+
+    # 保存
+    filename = f"sprite_{uuid.uuid4().hex[:10]}.png"
+    filepath = GENERATED_DIR / filename
+    sheet.save(filepath, "PNG")
+
+    # 各帧单独图路径
+    frame_urls = []
+    for i, frame_img in enumerate(frames):
+        fn = f"frame_{uuid.uuid4().hex[:6]}_{FRAME_ORDER[i]}.png"
+        frame_img.save(GENERATED_DIR / fn, "PNG")
+        frame_urls.append(f"/generated/{fn}")
+
+    return {
+        "success": True,
+        "filename": filename,
+        "url":      f"/generated/{filename}",
+        "frames":   frame_urls,
+        "frame_names": FRAME_ORDER,
+        "size":     size_str,
+        "layout":   "2x2",
+        "mode":     "prompt",
+        "used_fallback": frame_errors > 0,
+        "prompts_used": prompts_used,
     }
 
 @app.get("/api/history")
@@ -280,9 +344,9 @@ async def get_history():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "route": "B - img2img sprite sheet"}
+    return {"status": "ok", "route": "dual-mode sprite sheet (img2img + prompt)"}
 
 if __name__ == "__main__":
     import uvicorn
-    print("Game Asset Gen [Route B - Sprite Sheet] - http://localhost:8000")
+    print("Game Asset Gen [Dual-Mode Sprite Sheet] - http://localhost:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
