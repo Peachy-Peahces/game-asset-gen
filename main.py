@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 SF_API_URL = "https://api.siliconflow.cn/v1/images/generations"
-SF_API_KEY  = os.environ.get("SF_API_KEY", "sk-qldnafwtngpczmpvxbiwezsdwvpqhenneptfdbnqutwghkxx")
+SF_API_KEY  = os.environ.get("SF_API_KEY", "")
 MODEL_REF   = "Tongyi-MAI/Z-Image-Turbo"   # 参考图生成
 MODEL_IMG2  = "Qwen/Qwen-Image-Edit"       # img2img 各帧
 SSL_CTX     = ssl.create_default_context()
