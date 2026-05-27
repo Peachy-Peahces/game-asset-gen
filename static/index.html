@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Asset Gen - AI 2D素材生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .checkerboard { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%23ccc'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23ccc'/%3E%3C/svg%3E"); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-2">Game Asset Gen</h1>
+        <p class="text-gray-400 text-center mb-8">AI 2D游戏素材生成器 - 文本到像素艺术</p>
+        
+        <!-- Generator Form -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm mb-1">素材描述</label>
+                    <input type="text" id="prompt" placeholder="例如: 勇士骑士、魔法森林、宝箱..." 
+                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">素材类型</label>
+                    <select id="assetType" class="w-full bg-gray-700 rounded px-4 py-2">
+                        <option value="character">角色 (Character)</option>
+                        <option value="scene">场景 (Scene)</option>
+                        <option value="item">道具 (Item)</option>
+                        <option value="ui">UI元素</option>
+                        <option value="tileset">瓦片地图</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">风格</label>
+                    <select id="style" class="w-full bg-gray-700 rounded px-4 py-2">
+                        <option value="pixel">像素风 (Pixel Art)</option>
+                        <option value="cartoon">卡通风</option>
+                        <option value="jp_rpg">日式RPG</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm mb-1">尺寸</label>
+                    <select id="size" class="w-full bg-gray-700 rounded px-4 py-2">
+                        <option value="64x64">64x64</option>
+                        <option value="128x128" selected>128x128</option>
+                        <option value="256x256">256x256</option>
+                        <option value="512x512">512x512</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="generate()" id="genBtn" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 rounded px-6 py-2 font-semibold transition">
+                        生成素材
+                    </button>
+                </div>
+            </div>
+            <div id="status" class="text-sm text-gray-400 mt-2"></div>
+        </div>
+
+        <!-- Generated Image -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">生成结果</h2>
+            <div class="flex flex-col items-center">
+                <div id="resultContainer" class="checkerboard rounded-lg p-4 mb-4 min-h-[200px] flex items-center justify-center">
+                    <p class="text-gray-500">等待生成...</p>
+                </div>
+                <div id="downloadBtn" class="hidden">
+                    <a id="downloadLink" download class="bg-green-600 hover:bg-green-700 rounded px-6 py-2 font-semibold transition inline-block">
+                        下载 PNG
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- History -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">生成历史</h2>
+            <div id="history" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <p class="text-gray-500 col-span-full text-center py-4">暂无历史</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function generate() {
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) { alert('请输入素材描述'); return; }
+            
+            const btn = document.getElementById('genBtn');
+            const status = document.getElementById('status');
+            const result = document.getElementById('resultContainer');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loader inline-block"></span>';
+            status.textContent = '正在生成...';
+            result.innerHTML = '<div class="loader"></div>';
+            
+            try {
+                const resp = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        asset_type: document.getElementById('assetType').value,
+                        style: document.getElementById('style').value,
+                        size: document.getElementById('size').value
+                    })
+                });
+                const data = await resp.json();
+                
+                if (data.success) {
+                    result.innerHTML = `<img src="${data.url}?t=${Date.now()}" class="max-w-full rounded pixelated" style="image-rendering: pixelated; max-height: 300px;">`;
+                    document.getElementById('downloadBtn').classList.remove('hidden');
+                    document.getElementById('downloadLink').href = data.url;
+                    document.getElementById('downloadLink').download = data.filename;
+                    status.textContent = data.used_fallback ? '生成完成 (使用备用方案)' : '生成完成!';
+                    loadHistory();
+                } else {
+                    result.innerHTML = '<p class="text-red-400">生成失败</p>';
+                    status.textContent = '错误: ' + (data.error || '未知错误');
+                }
+            } catch (e) {
+                result.innerHTML = '<p class="text-red-400">请求失败</p>';
+                status.textContent = '错误: ' + e.message;
+            }
+            
+            btn.disabled = false;
+            btn.textContent = '生成素材';
+        }
+
+        async function loadHistory() {
+            try {
+                const resp = await fetch('/api/history');
+                const data = await resp.json();
+                const container = document.getElementById('history');
+                if (data.files.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 col-span-full text-center py-4">暂无历史</p>';
+                    return;
+                }
+                container.innerHTML = data.files.slice(0, 16).map(f => 
+                    `<div class="checkerboard rounded overflow-hidden">
+                        <img src="${f.url}" class="w-full h-auto pixelated" style="image-rendering: pixelated;">
+                    </div>`
+                ).join('');
+            } catch (e) {
+                console.error('History load error:', e);
+            }
+        }
+
+        // Enter key to generate
+        document.getElementById('prompt').addEventListener('keypress', e => { if (e.key === 'Enter') generate(); });
+        loadHistory();
+    </script>
+</body>
+</html>
