@@ -1,62 +1,74 @@
 # Game Asset Gen
 
-AI 2D Game Asset Generator - 七牛云 XEngineer 暑期实训营项目
+AI 2D 游戏素材生成器 — 七牛云 XEngineer 暑期实训营
 
 ## 功能
 
-- 文本生成 2D 游戏素材（角色/场景/道具/UI/Tileset）
-- 多种风格：像素风、卡通风、日式RPG
-- 多种尺寸：16x16 到 512x512
-- 自动透明背景处理
-- 一键下载 PNG
+### 单图生成
+- 文本 → 2D 游戏素材（角色/场景/道具/UI/Tileset）
+- 风格：像素风 · 卡通风 · 日式RPG
+- 尺寸：16×16 到 512×512
+- 自动透明背景 + PNG 下载
 
-## 技术栈
+### Sprite Sheet 多帧动画（新增）
+- 4 帧动画：待机 / 走路 / 攻击 / 施法
+- **2×2 排列**，可直入 Unity/Godot/Cocos
+- 两条技术路线（见下方）
 
-- 后端: Python FastAPI
-- 前端: HTML + Tailwind CSS
-- AI 生图: **SiliconFlow** (通义万相 Tongyi-MAI/Z-Image-Turbo)
+---
+
+## Sprite Sheet 两条路线
+
+| | 路线 B（生产推荐） | 路线 C（成本优先） |
+|---|---|---|
+| **方案** | 参考图 + img2img | 纯 prompt |
+| **模型** | Z-Image-Turbo + Qwen-Image-Edit | 全部 Z-Image-Turbo |
+| **角色一致性** | ✅ 好 | ⚠️ 一般 |
+| **成本** | ¥1.50 / 次 | ¥0.30 / 次 |
+| **生成时间** | ~2.5 分钟 | ~1 分钟 |
+| **分支** | `feature/sprite-sheet-img2img` | `feature/sprite-sheet-prompt` |
+
+---
 
 ## 快速开始
 
 ```bash
-# 安装依赖
 pip install -r requirements.txt
-
-# 配置 SiliconFlow API Key（可选，默认使用内置 key）
-# Windows
-set SF_API_KEY=sk-your-api-key
-# macOS/Linux
-export SF_API_KEY=sk-your-api-key
-
-# 运行
 python main.py
-
-# 访问
-# http://localhost:8000
+# 访问 http://localhost:8000
 ```
 
-> SiliconFlow 注册地址: https://cloud.siliconflow.cn
+> SiliconFlow 注册: https://cloud.siliconflow.cn  
+> SiliconFlow API Key: `sk-qldnafwtngpczmpvxbiwezsdwvpqhenneptfdbnqutwghkxx`（内置）
+
+---
 
 ## API
 
-- `POST /api/generate` - 生成素材
-- `GET /api/history` - 获取历史
-- `GET /api/health` - 健康检查
+| 端点 | 说明 |
+|---|---|
+| `POST /api/generate` | 单图生成 |
+| `POST /api/generate-spritesheet` | Sprite Sheet 生成（4帧） |
+| `GET /api/history` | 历史记录 |
+| `GET /api/health` | 健康检查 |
+
+---
 
 ## 项目结构
 
 ```
 game-asset-gen/
-├── main.py           # FastAPI 后端
-├── requirements.txt  # 依赖
+├── main.py              # FastAPI 后端（Python 3.8+）
+├── requirements.txt
 ├── static/
-│   └── index.html    # 前端页面
-└── generated/        # 生成的图片
+│   └── index.html       # 前端（Tailwind CSS + Vanilla JS）
+├── generated/           # 生成的图片
+└── README.md
 ```
 
 ## 技术说明
 
-- 使用 `urllib` 而非 `httpx` 调用 API，兼容 Python 3.8 环境下的 SSL 问题
-- 生成后自动 resize 到用户选择的尺寸（使用 PIL NEAREST 缩放保留像素感）
-- 生成后自动简单去背（白色背景转透明）
-- API 调用失败时自动降级为彩色格子占位图
+- **Python 3.8 兼容**: 用 `urllib` + `ThreadPoolExecutor` 替代 `httpx` + `asyncio.to_thread`
+- **去背**: 简单阈值法（白色→透明），浅色背景可能残留
+- **降级**: API 失败时自动生成彩色格子占位图
+- **前端**: 两个 Tab（单图 / Sprite Sheet），历史记录自动刷新
