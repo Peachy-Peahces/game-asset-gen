@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6,118 +6,213 @@
     <title>Game Asset Gen - AI 2D素材生成器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        .loader { border: 3px solid #374151; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .checkerboard { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%23ccc'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23ccc'/%3E%3C/svg%3E"); }
+        .checkerboard { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%23cccccc'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23cccccc'/%3E%3C/svg%3E"); }
+        .pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <h1 class="text-3xl font-bold text-center mb-2">Game Asset Gen</h1>
-        <p class="text-gray-400 text-center mb-8">AI 2D游戏素材生成器 - 文本到像素艺术</p>
-        
-        <!-- Generator Form -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div class="md:col-span-2">
-                    <label class="block text-sm mb-1">素材描述</label>
-                    <input type="text" id="prompt" placeholder="例如: 勇士骑士、魔法森林、宝箱..." 
-                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">素材类型</label>
-                    <select id="assetType" class="w-full bg-gray-700 rounded px-4 py-2">
-                        <option value="character">角色 (Character)</option>
-                        <option value="scene">场景 (Scene)</option>
-                        <option value="item">道具 (Item)</option>
-                        <option value="ui">UI元素</option>
-                        <option value="tileset">瓦片地图</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">风格</label>
-                    <select id="style" class="w-full bg-gray-700 rounded px-4 py-2">
-                        <option value="pixel">像素风 (Pixel Art)</option>
-                        <option value="cartoon">卡通风</option>
-                        <option value="jp_rpg">日式RPG</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm mb-1">尺寸</label>
-                    <select id="size" class="w-full bg-gray-700 rounded px-4 py-2">
-                        <option value="64x64">64x64</option>
-                        <option value="128x128" selected>128x128</option>
-                        <option value="256x256">256x256</option>
-                        <option value="512x512">512x512</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <button onclick="generate()" id="genBtn" 
-                            class="w-full bg-blue-600 hover:bg-blue-700 rounded px-6 py-2 font-semibold transition">
-                        生成素材
-                    </button>
-                </div>
-            </div>
-            <div id="status" class="text-sm text-gray-400 mt-2"></div>
+
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-center mb-1">Game Asset Gen</h1>
+        <p class="text-gray-400 text-center mb-6">AI 2D游戏素材生成器 · 七牛云 XEngineer 实训营</p>
+
+        <!-- Mode Tabs -->
+        <div class="flex border-b border-gray-700 mb-6">
+            <button id="tab-single" onclick="switchTab('single')"
+                    class="px-6 py-3 text-gray-400 hover:text-white transition tab-active">
+                🎨 单图生成
+            </button>
+            <button id="tab-sprite" onclick="switchTab('sprite')"
+                    class="px-6 py-3 text-gray-400 hover:text-white transition">
+                🕹️ Sprite Sheet（4帧动画）
+            </button>
         </div>
 
-        <!-- Generated Image -->
-        <div class="bg-gray-800 rounded-lg p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">生成结果</h2>
-            <div class="flex flex-col items-center">
-                <div id="resultContainer" class="checkerboard rounded-lg p-4 mb-4 min-h-[200px] flex items-center justify-center">
-                    <p class="text-gray-500">等待生成...</p>
+        <!-- ────────────── Single Image Mode ────────────── -->
+        <div id="panel-single">
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm mb-1 text-gray-400">素材描述</label>
+                        <input type="text" id="prompt" placeholder="例如: 勇士骑士、魔法森林、宝箱..."
+                               class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">素材类型</label>
+                        <select id="assetType" class="w-full bg-gray-700 rounded px-4 py-2">
+                            <option value="character">角色 (Character)</option>
+                            <option value="scene">场景 (Scene)</option>
+                            <option value="item">道具 (Item)</option>
+                            <option value="ui">UI元素</option>
+                            <option value="tileset">瓦片地图</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">风格</label>
+                        <select id="style" class="w-full bg-gray-700 rounded px-4 py-2">
+                            <option value="pixel">像素风 (Pixel Art)</option>
+                            <option value="cartoon">卡通风</option>
+                            <option value="jp_rpg">日式RPG</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">尺寸</label>
+                        <select id="size" class="w-full bg-gray-700 rounded px-4 py-2">
+                            <option value="16x16">16×16</option>
+                            <option value="32x32">32×32</option>
+                            <option value="64x64">64×64</option>
+                            <option value="128x128" selected>128×128</option>
+                            <option value="256x256">256×256</option>
+                            <option value="512x512">512×512</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="generateSingle()" id="genBtn"
+                                class="w-full bg-blue-600 hover:bg-blue-700 rounded px-6 py-2 font-semibold transition">
+                            生成素材
+                        </button>
+                    </div>
                 </div>
-                <div id="downloadBtn" class="hidden">
-                    <a id="downloadLink" download class="bg-green-600 hover:bg-green-700 rounded px-6 py-2 font-semibold transition inline-block">
-                        下载 PNG
-                    </a>
+                <div id="status" class="text-sm text-gray-400 mt-2"></div>
+            </div>
+
+            <!-- Single Result -->
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">生成结果</h2>
+                <div class="flex flex-col items-center">
+                    <div id="resultContainer" class="checkerboard rounded-lg p-4 mb-4 min-h-[200px] flex items-center justify-center w-full">
+                        <p class="text-gray-500">等待生成...</p>
+                    </div>
+                    <div id="downloadBtn" class="hidden">
+                        <a id="downloadLink" download class="bg-green-600 hover:bg-green-700 rounded px-6 py-2 font-semibold transition inline-block">
+                            下载 PNG
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- History -->
-        <div class="bg-gray-800 rounded-lg p-6">
+        <!-- ────────────── Sprite Sheet Mode ────────────── -->
+        <div id="panel-sprite" class="hidden">
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <div class="flex items-start gap-3 mb-4">
+                    <div class="bg-blue-900/50 rounded-lg p-3 text-sm text-blue-300 flex-1">
+                        💡 <b>Sprite Sheet 模式</b>：使用 img2img 技术保持角色一致性，生成 4 帧动画（待机→走路→攻击→施法），2×2 排列，可直接拖入游戏引擎使用。
+                        <br><span class="text-blue-400/70 text-xs">成本：约 ¥1.50/次（参考图 + 4帧 img2img）</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm mb-1 text-gray-400">角色描述（建议一个名词，如"火焰法师"）</label>
+                        <input type="text" id="spritePrompt" placeholder="例如: 火焰法师、暗影刺客、机械骑士..."
+                               class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">风格</label>
+                        <select id="spriteStyle" class="w-full bg-gray-700 rounded px-4 py-2">
+                            <option value="pixel">像素风 Pixel Art</option>
+                            <option value="cartoon">卡通风 Cartoon</option>
+                            <option value="jp_rpg">日式RPG SNES</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">帧尺寸（最终尺寸）</label>
+                        <select id="spriteSize" class="w-full bg-gray-700 rounded px-4 py-2">
+                            <option value="32x32">32×32（小型角色）</option>
+                            <option value="64x64" selected>64×64（标准角色）</option>
+                            <option value="128x128">128×128（大型角色）</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="generateSprite()" id="spriteBtn"
+                                class="w-full bg-purple-600 hover:bg-purple-700 rounded px-6 py-2 font-semibold transition">
+                            生成 Sprite Sheet
+                        </button>
+                    </div>
+                </div>
+                <div id="spriteStatus" class="text-sm text-gray-400 mt-2"></div>
+            </div>
+
+            <!-- Sprite Sheet Result -->
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-2">Sprite Sheet <span class="text-gray-500 text-sm font-normal">（2×2 排列）</span></h2>
+                <div class="grid grid-cols-4 gap-2 text-center text-xs text-gray-500 mb-3">
+                    <span>idle (待机)</span><span>walk (走路)</span><span>attack (攻击)</span><span>cast (施法)</span>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="spriteResult" class="checkerboard rounded-lg p-4 mb-4 min-h-[200px] flex items-center justify-center w-full">
+                        <p class="text-gray-500">等待生成...</p>
+                    </div>
+                    <div id="spriteDownloadBtn" class="hidden flex gap-3">
+                        <a id="spriteDownloadLink" download class="bg-green-600 hover:bg-green-700 rounded px-6 py-2 font-semibold transition inline-block">
+                            下载 Sprite Sheet
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Frame Preview Grid -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">各帧预览</h2>
+                <div class="grid grid-cols-4 gap-4" id="frameGrid">
+                    <div class="text-center text-gray-500 col-span-4 py-4">生成后显示</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ────────────── History ────────────── -->
+        <div class="bg-gray-800 rounded-lg p-6 mt-6">
             <h2 class="text-xl font-semibold mb-4">生成历史</h2>
             <div id="history" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                 <p class="text-gray-500 col-span-full text-center py-4">暂无历史</p>
             </div>
         </div>
+
     </div>
 
     <script>
-        async function generate() {
+        // ── Tab Switch ──────────────────────────────────────────
+        function switchTab(tab) {
+            const single = document.getElementById('panel-single');
+            const sprite  = document.getElementById('panel-sprite');
+            document.getElementById('tab-single').classList.toggle('tab-active', tab === 'single');
+            document.getElementById('tab-sprite').classList.toggle('tab-active',  tab === 'sprite');
+            single.classList.toggle('hidden', tab !== 'single');
+            sprite.classList.toggle('hidden',  tab !== 'sprite');
+        }
+
+        // ── Single Image Generation ─────────────────────────────
+        async function generateSingle() {
             const prompt = document.getElementById('prompt').value.trim();
             if (!prompt) { alert('请输入素材描述'); return; }
-            
             const btn = document.getElementById('genBtn');
             const status = document.getElementById('status');
             const result = document.getElementById('resultContainer');
-            
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loader inline-block"></span>';
+            btn.disabled = true; btn.innerHTML = '<span class="loader inline-block"></span>';
             status.textContent = '正在生成...';
             result.innerHTML = '<div class="loader"></div>';
-            
             try {
                 const resp = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        prompt: prompt,
+                        prompt: document.getElementById('prompt').value,
                         asset_type: document.getElementById('assetType').value,
                         style: document.getElementById('style').value,
                         size: document.getElementById('size').value
                     })
                 });
                 const data = await resp.json();
-                
                 if (data.success) {
-                    result.innerHTML = `<img src="${data.url}?t=${Date.now()}" class="max-w-full rounded pixelated" style="image-rendering: pixelated; max-height: 300px;">`;
+                    result.innerHTML = `<img src="${data.url}?t=${Date.now()}" class="pixelated rounded" style="max-height:280px;">`;
                     document.getElementById('downloadBtn').classList.remove('hidden');
                     document.getElementById('downloadLink').href = data.url;
                     document.getElementById('downloadLink').download = data.filename;
-                    status.textContent = data.used_fallback ? '生成完成 (使用备用方案)' : '生成完成!';
+                    status.textContent = data.used_fallback ? '✅ 生成完成（备用方案）' : '✅ 生成完成！';
                     loadHistory();
                 } else {
                     result.innerHTML = '<p class="text-red-400">生成失败</p>';
@@ -127,32 +222,98 @@
                 result.innerHTML = '<p class="text-red-400">请求失败</p>';
                 status.textContent = '错误: ' + e.message;
             }
-            
-            btn.disabled = false;
-            btn.textContent = '生成素材';
+            btn.disabled = false; btn.textContent = '生成素材';
         }
 
+        // ── Sprite Sheet Generation ─────────────────────────────
+        async function generateSprite() {
+            const prompt = document.getElementById('spritePrompt').value.trim();
+            if (!prompt) { alert('请输入角色描述'); return; }
+            const btn = document.getElementById('spriteBtn');
+            const status = document.getElementById('spriteStatus');
+            const result = document.getElementById('spriteResult');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loader inline-block"></span>';
+            status.textContent = '正在生成参考图 + 4帧动画（约30秒）...';
+            result.innerHTML = '<div class="loader"></div>';
+
+            const frameNames = ['idle待机', 'walk走路', 'attack攻击', 'cast施法'];
+            let html = '<div class="grid grid-cols-4 gap-2 w-full text-center">';
+            for (const fn of frameNames) html += `<div class="loader mx-auto" title="${fn}"></div>`;
+            html += '</div><p class="text-gray-400 mt-2 text-sm">正在生成各帧...</p>';
+            result.innerHTML = html;
+
+            try {
+                const resp = await fetch('/api/generate-spritesheet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        style: document.getElementById('spriteStyle').value,
+                        size: document.getElementById('spriteSize').value
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    // Sprite Sheet 大图
+                    result.innerHTML = `<img src="${data.url}?t=${Date.now()}" class="pixelated rounded" style="max-height:280px;">`;
+                    document.getElementById('spriteDownloadBtn').classList.remove('hidden');
+                    document.getElementById('spriteDownloadLink').href = data.url;
+                    document.getElementById('spriteDownloadLink').download = data.filename;
+                    status.textContent = data.used_fallback
+                        ? '✅ 完成（含部分备用帧）'
+                        : '✅ Sprite Sheet 生成完成！';
+
+                    // 各帧预览
+                    const frameGrid = document.getElementById('frameGrid');
+                    let frameHtml = '';
+                    for (let i = 0; i < data.frames.length; i++) {
+                        const frameUrl = data.frames[i];
+                        const frameName = data.frame_names[i];
+                        const labels = {idle:'待机', walk:'走路', attack:'攻击', cast:'施法'};
+                        frameHtml += `
+                            <div class="text-center">
+                                <div class="checkerboard rounded-lg p-2 mb-1 inline-block">
+                                    <img src="${frameUrl}?t=${Date.now()}" class="pixelated" style="max-width:96px;max-height:96px;">
+                                </div>
+                                <div class="text-xs text-gray-400">${frameName}（${labels[frameName]||''}）</div>
+                            </div>`;
+                    }
+                    frameGrid.innerHTML = frameHtml;
+                    loadHistory();
+                } else {
+                    result.innerHTML = '<p class="text-red-400">生成失败: ' + (data.error || '') + '</p>';
+                    status.textContent = '❌ 错误';
+                }
+            } catch (e) {
+                result.innerHTML = '<p class="text-red-400">请求失败: ' + e.message + '</p>';
+                status.textContent = '❌ 错误';
+            }
+            btn.disabled = false;
+            btn.textContent = '生成 Sprite Sheet';
+        }
+
+        // ── History ────────────────────────────────────────────
         async function loadHistory() {
             try {
                 const resp = await fetch('/api/history');
                 const data = await resp.json();
                 const container = document.getElementById('history');
-                if (data.files.length === 0) {
+                if (!data.files || data.files.length === 0) {
                     container.innerHTML = '<p class="text-gray-500 col-span-full text-center py-4">暂无历史</p>';
                     return;
                 }
-                container.innerHTML = data.files.slice(0, 16).map(f => 
+                container.innerHTML = data.files.slice(0, 16).map(f =>
                     `<div class="checkerboard rounded overflow-hidden">
-                        <img src="${f.url}" class="w-full h-auto pixelated" style="image-rendering: pixelated;">
+                        <img src="${f.url}" class="w-full h-auto pixelated">
                     </div>`
                 ).join('');
-            } catch (e) {
-                console.error('History load error:', e);
-            }
+            } catch (e) { console.error('History error:', e); }
         }
 
-        // Enter key to generate
-        document.getElementById('prompt').addEventListener('keypress', e => { if (e.key === 'Enter') generate(); });
+        // Enter key support
+        document.getElementById('prompt').addEventListener('keypress', e => { if (e.key === 'Enter') generateSingle(); });
+        document.getElementById('spritePrompt').addEventListener('keypress', e => { if (e.key === 'Enter') generateSprite(); });
         loadHistory();
     </script>
 </body>
