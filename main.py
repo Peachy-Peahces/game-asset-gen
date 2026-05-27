@@ -27,7 +27,37 @@ from pydantic import BaseModel
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 SF_API_URL = "https://api.siliconflow.cn/v1/images/generations"
-SF_API_KEY  = os.environ.get("SF_API_KEY", "")
+
+def _load_api_key() -> str:
+    """API Key 读取优先级：环境变量 > config.json > 报错"""
+    # 1. 环境变量（最高优先级）
+    key = os.environ.get("SF_API_KEY", "").strip()
+    if key:
+        print("[Config] API Key 来源: 环境变量 SF_API_KEY")
+        return key
+    # 2. config.json（本地配置文件，不提交到 Git）
+    config_path = Path(__file__).parent / "config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            key = cfg.get("SF_API_KEY", "").strip()
+            if key:
+                print("[Config] API Key 来源: config.json")
+                return key
+        except Exception as e:
+            print(f"[Config] 读取 config.json 失败: {e}")
+    # 3. 都没有
+    print("=" * 60)
+    print("⚠️  未找到 SF_API_KEY！")
+    print("   请选择以下任一方式配置：")
+    print("   1. 环境变量:   $env:SF_API_KEY=\"sk-...\"  (Windows PowerShell)")
+    print("                   export SF_API_KEY=\"sk-...\"  (macOS/Linux)")
+    print("   2. 配置文件:   创建 config.json（参考 config.json.example）")
+    print("=" * 60)
+    return ""
+
+SF_API_KEY = _load_api_key()
 MODEL_REF   = "Tongyi-MAI/Z-Image-Turbo"   # 参考图生成
 MODEL_IMG2  = "Qwen/Qwen-Image-Edit"       # img2img 各帧
 SSL_CTX     = ssl.create_default_context()
